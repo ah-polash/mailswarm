@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
-export const maxDuration = 300; // give the loop room on Vercel
-
 // Continues campaigns that are stuck mid-send, so a large campaign finishes
 // without anyone keeping the dashboard tab open.
 //
-// Vercel Hobby plans only allow ONE cron run per day, so vercel.json schedules
-// this daily as a safety net. For prompt completion, call it directly (with the
-// secret) or point an external scheduler at it every few minutes.
+// The VPS calls this every 5 minutes from root's crontab (see the mailswarm-vps
+// deploy scripts).
 //
-// Auth: Vercel Cron sends `Authorization: Bearer $CRON_SECRET`. Manual calls can
-// pass ?secret=... instead. If CRON_SECRET is unset the endpoint is disabled.
+// Auth: `Authorization: Bearer $CRON_SECRET`, or ?secret=... for manual calls.
+// If CRON_SECRET is unset the endpoint is disabled.
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret) {

@@ -8,8 +8,8 @@ import os from "node:os";
 // spend a Claude subscription than API credits.
 //
 // IMPORTANT: this only works where the binary exists — a developer machine or a
-// self-hosted server. Serverless deployments (Vercel) cannot spawn it, so the
-// caller must fall back to an API provider there.
+// server where it is installed (the production VPS doesn't have it), so the
+// caller must fall back to an API provider elsewhere.
 
 const DEFAULT_CANDIDATES = [
   path.join(os.homedir(), ".local/bin/claude"),

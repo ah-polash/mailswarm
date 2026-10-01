@@ -2516,9 +2516,9 @@ export function SettingsView() {
                       <p className="font-medium">Runs on the machine hosting this app</p>
                       <p className="mt-1 text-muted-foreground">
                         It uses your Claude Code subscription instead of API credits, so no API key
-                        is needed. This works when you run the app locally or on your own server —
-                        the deployed site on Vercel cannot start a local process, so generation
-                        there will fail with a clear error. Keep an API-based connection for production.
+                        is needed. It only works where the Claude CLI is installed — the production
+                        server doesn&apos;t have it, so generation there will fail with a clear error.
+                        Keep an API-based connection for production.
                       </p>
                     </div>
                   </div>

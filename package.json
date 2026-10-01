@@ -20,7 +20,6 @@
     "@react-email/components": "^1.0.9",
     "@resvg/resvg-js": "^2.6.2",
     "@types/js-beautify": "^1.14.3",
-    "@vercel/analytics": "^2.0.1",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
