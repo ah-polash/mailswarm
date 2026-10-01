@@ -4,6 +4,7 @@ import { sendEmail } from "@/lib/ses";
 import { getByPath, resolveMergeTags } from "@/lib/merge";
 import { unsubscribeLinks } from "@/lib/unsubscribe";
 import { addUtmParams, utmSlug } from "@/lib/utm";
+import { localBaseUrlProblem } from "@/lib/public-url";
 
 export { getByPath, resolveMergeTags };
 
@@ -117,6 +118,10 @@ export async function fireSequenceStep(
   }
 
   const baseUrl = getBaseUrl();
+  const baseUrlProblem = localBaseUrlProblem(baseUrl);
+  if (baseUrlProblem) {
+    return log({ status: "failed", error: baseUrlProblem });
+  }
   const unsubscribe = unsubscribeLinks(baseUrl, email);
 
   // Payload values are untrusted (anyone with the webhook token supplies them):

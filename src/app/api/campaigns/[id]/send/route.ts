@@ -5,6 +5,7 @@ import { sendBulkEmails } from "@/lib/ses";
 import { getSegmentContacts } from "@/lib/swipeone";
 import { unsubscribeLinks } from "@/lib/unsubscribe";
 import { addUtmParams, utmSlug } from "@/lib/utm";
+import { localBaseUrlProblem } from "@/lib/public-url";
 
 export async function POST(
   request: NextRequest,
@@ -71,6 +72,12 @@ export async function POST(
         },
       });
       return NextResponse.json({ campaign: updated });
+    }
+
+    const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const baseUrlProblem = localBaseUrlProblem(baseUrl);
+    if (baseUrlProblem) {
+      return NextResponse.json({ error: baseUrlProblem }, { status: 400 });
     }
 
     if (!campaign.fromEmail) {
@@ -205,8 +212,6 @@ export async function POST(
         { status: 409 }
       );
     }
-
-    const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
     // Also check for any previously bounced (hard) or complained emails across all campaigns
     const suppressedEvents = await prisma.campaignEvent.findMany({
