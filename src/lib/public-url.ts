@@ -3,6 +3,21 @@
 // still talks to the production database and SES, but its base URL is
 // localhost — mail it sends reaches real people with links that only work on
 // the developer's machine (this happened to ~925 recipients on 2026-10-01).
+//
+// EMAIL_LINK_BASE_URL decouples the two: a local copy with
+// EMAIL_LINK_BASE_URL=https://mailswarm.bplugins.com can send, and every link
+// it puts in an email points at the live server (same database, same
+// AUTH_SECRET, so tracking and signed unsubscribe links work there).
+
+/** Base URL for links inside outgoing emails. */
+export function emailLinkBaseUrl(): string {
+  return (
+    process.env.EMAIL_LINK_BASE_URL ||
+    process.env.NEXTAUTH_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "http://localhost:3000"
+  ).replace(/\/+$/, "");
+}
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "[::1]", "::1"]);
 
@@ -16,9 +31,10 @@ export function localBaseUrlProblem(baseUrl: string): string | null {
   }
   if (LOCAL_HOSTS.has(host) || host.endsWith(".localhost") || host.endsWith(".local")) {
     return (
-      `This copy of the app runs at ${baseUrl}, so every link in the email (buttons, ` +
-      `unsubscribe) would point to this computer and be broken for recipients. ` +
-      `Send from https://mailswarm.bplugins.com instead.`
+      `Email links would point to ${baseUrl}, which only works on this computer, so ` +
+      `buttons and unsubscribe links would be broken for recipients. Send from ` +
+      `https://mailswarm.bplugins.com, or set EMAIL_LINK_BASE_URL=https://mailswarm.bplugins.com ` +
+      `in this copy's .env and restart it.`
     );
   }
   return null;

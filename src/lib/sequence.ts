@@ -4,7 +4,7 @@ import { sendEmail } from "@/lib/ses";
 import { getByPath, resolveMergeTags } from "@/lib/merge";
 import { unsubscribeLinks } from "@/lib/unsubscribe";
 import { addUtmParams, utmSlug } from "@/lib/utm";
-import { localBaseUrlProblem } from "@/lib/public-url";
+import { emailLinkBaseUrl, localBaseUrlProblem } from "@/lib/public-url";
 
 export { getByPath, resolveMergeTags };
 
@@ -18,11 +18,7 @@ export function tokensMatch(provided: string, expected: string): boolean {
 }
 
 export function getBaseUrl(): string {
-  return (
-    process.env.NEXTAUTH_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    "http://localhost:3000"
-  ).replace(/\/+$/, "");
+  return emailLinkBaseUrl();
 }
 
 // The public webhook URL for firing one step of a sequence. External systems
