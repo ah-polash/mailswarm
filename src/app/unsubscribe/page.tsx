@@ -27,12 +27,15 @@ interface InfoResponse {
   categories: CategoryItem[];
   optedOutCategoryIds: string[];
   isGloballyUnsubscribed: boolean;
+  /** Old unsigned link: only "unsubscribe from all" is allowed. */
+  legacy?: boolean;
 }
 
 function UnsubscribeContent() {
   const searchParams = useSearchParams();
   const email = searchParams.get("email");
   const campaignId = searchParams.get("campaignId");
+  const token = searchParams.get("t");
 
   const [loading, setLoading] = useState(true);
   const [info, setInfo] = useState<InfoResponse | null>(null);
@@ -54,6 +57,7 @@ function UnsubscribeContent() {
       try {
         const params = new URLSearchParams({ email });
         if (campaignId) params.set("campaignId", campaignId);
+        if (token) params.set("t", token);
         const res = await fetch(`/api/unsubscribe?${params.toString()}`);
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
@@ -91,7 +95,7 @@ function UnsubscribeContent() {
       }
     }
     fetchInfo();
-  }, [email, campaignId]);
+  }, [email, campaignId, token]);
 
   const toggleCategory = (id: string, checked: boolean) => {
     setSelectedCategoryIds((prev) => {
@@ -136,6 +140,7 @@ function UnsubscribeContent() {
         body: JSON.stringify({
           email,
           campaignId,
+          t: token,
           scope: unsubscribeAll ? "all" : "categories",
           categoryIds: unsubscribeAll ? [] : Array.from(selectedCategoryIds),
         }),
@@ -199,7 +204,12 @@ function UnsubscribeContent() {
         )}
       </div>
 
-      {info.categories.length === 0 ? (
+      {info.legacy ? (
+        <p className="text-sm text-muted-foreground">
+          This is an older link, so it can only unsubscribe you from all emails. To choose
+          specific categories instead, use the unsubscribe link in a recent email.
+        </p>
+      ) : info.categories.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           No category preferences are configured. You can still unsubscribe from
           all emails below.

@@ -3,6 +3,7 @@ import { requireSuperAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { sendBulkEmails } from "@/lib/ses";
 import { getSegmentContacts } from "@/lib/swipeone";
+import { unsubscribeLinks } from "@/lib/unsubscribe";
 
 export async function POST(
   request: NextRequest,
@@ -364,13 +365,15 @@ export async function POST(
       let htmlBody = resolveMergeTags(campaign.htmlContent, contactData);
       htmlBody = wrapLinksForTracking(htmlBody, id, email);
       htmlBody = injectOpenPixel(htmlBody, id, email);
+      const unsubscribe = unsubscribeLinks(baseUrl, email, id);
       return {
         to: email,
         subject: resolveMergeTags(campaign.subject, contactData),
         htmlBody,
         fromEmail: campaign.fromEmail,
         fromName: campaign.fromName,
-        unsubscribeUrl: `${baseUrl}/unsubscribe?email=${encodeURIComponent(email)}&campaignId=${id}`,
+        unsubscribeUrl: unsubscribe.pageUrl,
+        oneClickUnsubscribeUrl: unsubscribe.oneClickUrl,
       };
     });
 

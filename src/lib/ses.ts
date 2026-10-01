@@ -151,6 +151,8 @@ export interface SendEmailParams {
   fromName: string;
   campaignId?: string;
   unsubscribeUrl?: string;
+  /** Target of the List-Unsubscribe header; see unsubscribeLinks() in src/lib/unsubscribe.ts. */
+  oneClickUnsubscribeUrl?: string;
 }
 
 export async function sendEmail(params: SendEmailParams): Promise<{ messageId?: string; error?: string }> {
@@ -169,10 +171,14 @@ export async function sendEmail(params: SendEmailParams): Promise<{ messageId?: 
         </div>`
       : "");
 
+    // One-click (RFC 8058) only when there is an endpoint that accepts the POST;
+    // the footer link is a page, which can't.
     const headers: Record<string, string> = {};
-    if (unsubscribeLink) {
-      headers["List-Unsubscribe"] = `<${unsubscribeLink}>`;
+    if (params.oneClickUnsubscribeUrl) {
+      headers["List-Unsubscribe"] = `<${params.oneClickUnsubscribeUrl}>`;
       headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
+    } else if (unsubscribeLink) {
+      headers["List-Unsubscribe"] = `<${unsubscribeLink}>`;
     }
 
     const fromAddress = params.fromName
@@ -223,7 +229,7 @@ export async function sendEmail(params: SendEmailParams): Promise<{ messageId?: 
 
 // Send emails in batches with rate limiting (SES best practice)
 export async function sendBulkEmails(
-  emails: { to: string; subject: string; htmlBody: string; fromEmail: string; fromName: string; unsubscribeUrl: string }[],
+  emails: { to: string; subject: string; htmlBody: string; fromEmail: string; fromName: string; unsubscribeUrl: string; oneClickUnsubscribeUrl: string }[],
   campaignId: string,
   ratePerSecond: number = 10
 ): Promise<{ sent: number; failed: number; errors: string[] }> {
@@ -252,6 +258,7 @@ export async function sendBulkEmails(
       fromName: email.fromName,
       campaignId,
       unsubscribeUrl: email.unsubscribeUrl,
+      oneClickUnsubscribeUrl: email.oneClickUnsubscribeUrl,
     });
 
     if (result.messageId) {

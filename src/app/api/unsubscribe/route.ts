@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import {
-  tagContactAllEmailsUnsubscribed,
-  tagContactWithCategorySlugs,
-} from "@/lib/swipeone";
+import { tagContactWithCategorySlugs } from "@/lib/swipeone";
+import { applyGlobalUnsubscribe, unsubscribeAccess } from "@/lib/unsubscribe";
+
+const DENIED = {
+  error: "This unsubscribe link is invalid or has expired. Please use the link in a recent email.",
+};
 
 // GET: Return info needed to render the unsubscribe page.
-// Backwards-compat: if `apply=1` (or no `apply` param + legacy one-click links)
-// is passed, perform a global unsubscribe immediately and return the legacy
-// success payload. Otherwise just return info.
+// Backwards-compat: if `apply=1` is passed, perform a global unsubscribe
+// immediately and return the legacy success payload. Otherwise just return info.
+// Every request needs the link's signature (`t`); see src/lib/unsubscribe.ts.
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -18,6 +20,11 @@ export async function GET(request: NextRequest) {
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    }
+
+    const access = unsubscribeAccess(email, campaignId, searchParams.get("t"));
+    if (access === "denied") {
+      return NextResponse.json(DENIED, { status: 403 });
     }
 
     // Resolve campaign + its category (if tagged) so the UI can pre-check it.
@@ -39,6 +46,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: "You have been successfully unsubscribed.",
+      });
+    }
+
+    // Unsigned legacy links may only unsubscribe from everything, so don't
+    // reveal this address's preferences or campaign to whoever holds one.
+    if (access === "legacy") {
+      return NextResponse.json({
+        email,
+        campaign: null,
+        categories: [],
+        optedOutCategoryIds: [],
+        isGloballyUnsubscribed: false,
+        legacy: true,
       });
     }
 
@@ -94,7 +114,7 @@ export async function GET(request: NextRequest) {
 }
 
 // POST: Apply the user's unsubscribe choice.
-// Body: { email, campaignId?, scope: "all" | "categories", categoryIds?: string[] }
+// Body: { email, campaignId?, t, scope: "all" | "categories", categoryIds?: string[] }
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -107,6 +127,11 @@ export async function POST(request: NextRequest) {
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    }
+
+    const access = unsubscribeAccess(email, campaignId, typeof body?.t === "string" ? body.t : null);
+    if (access === "denied" || (access === "legacy" && scope !== "all")) {
+      return NextResponse.json(DENIED, { status: 403 });
     }
 
     let campaign: Awaited<ReturnType<typeof prisma.campaign.findUnique>> = null;
@@ -215,94 +240,5 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json({ error: message }, { status: 500 });
-  }
-}
-
-// ── Helpers ──
-
-async function applyGlobalUnsubscribe(args: {
-  email: string;
-  campaignId?: string;
-  audienceSource: string | null;
-}) {
-  const { email, campaignId, audienceSource } = args;
-
-  // Idempotent campaign-event recording (only if we have a campaign context).
-  if (campaignId) {
-    const existing = await prisma.campaignEvent.findFirst({
-      where: { campaignId, email, eventType: "unsubscribed" },
-    });
-    if (!existing) {
-      await prisma.campaignEvent.create({
-        data: {
-          campaignId,
-          email,
-          eventType: "unsubscribed",
-          metadata: JSON.stringify({
-            scope: "all",
-            timestamp: new Date().toISOString(),
-          }),
-        },
-      });
-      await prisma.campaign.update({
-        where: { id: campaignId },
-        data: { totalUnsubscribed: { increment: 1 } },
-      });
-    } else {
-      // Upgrade an existing category-scoped unsub to a global unsub by
-      // rewriting its metadata. The event is already counted.
-      try {
-        const meta = JSON.parse(existing.metadata || "{}");
-        if (meta?.scope === "categories") {
-          await prisma.campaignEvent.update({
-            where: { id: existing.id },
-            data: {
-              metadata: JSON.stringify({
-                scope: "all",
-                timestamp: new Date().toISOString(),
-              }),
-            },
-          });
-        }
-      } catch { /* ignore */ }
-    }
-  }
-
-  // Best-effort SwipeOne tagging (runs regardless of audience source — every
-  // global unsubscribe should tag the SwipeOne contact with `all_emails` and
-  // `user.marketing.opted_out`).
-  try {
-    await tagContactAllEmailsUnsubscribed(email);
-  } catch {
-    // Best-effort — never block the unsubscribe response on SwipeOne.
-  }
-
-  // Local Contact upkeep — flip flags so internal-audience campaigns also
-  // honor the opt-out, and store the tags locally for the contacts UI.
-  if (audienceSource !== "swipeone") {
-    const wantedTags = ["all_emails", "unsubscribed", "user.marketing.opted_out"];
-    const contact = await prisma.contact.findUnique({ where: { email } });
-    if (contact) {
-      let tags: string[] = [];
-      try { tags = JSON.parse(contact.tags || "[]"); } catch { /* ignore */ }
-      for (const t of wantedTags) if (!tags.includes(t)) tags.push(t);
-      await prisma.contact.update({
-        where: { email },
-        data: {
-          isMarketingAllowed: false,
-          emailMarketingConsent: false,
-          tags: JSON.stringify(tags),
-        },
-      });
-    } else {
-      await prisma.contact.create({
-        data: {
-          email,
-          isMarketingAllowed: false,
-          emailMarketingConsent: false,
-          tags: JSON.stringify(wantedTags),
-        },
-      });
-    }
   }
 }

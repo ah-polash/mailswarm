@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/ses";
 import { getByPath, resolveMergeTags } from "@/lib/merge";
+import { unsubscribeLinks } from "@/lib/unsubscribe";
 
 export { getByPath, resolveMergeTags };
 
@@ -115,7 +116,7 @@ export async function fireSequenceStep(
   }
 
   const baseUrl = getBaseUrl();
-  const unsubscribeUrl = `${baseUrl}/unsubscribe?email=${encodeURIComponent(email)}`;
+  const unsubscribe = unsubscribeLinks(baseUrl, email);
 
   // Payload values are untrusted (anyone with the webhook token supplies them):
   // escape them inside the HTML body, and strip CR/LF from the header-ish
@@ -132,7 +133,8 @@ export async function fireSequenceStep(
     htmlBody,
     fromEmail: step.sequence.fromEmail,
     fromName,
-    unsubscribeUrl,
+    unsubscribeUrl: unsubscribe.pageUrl,
+    oneClickUnsubscribeUrl: unsubscribe.oneClickUrl,
   });
 
   if (result.error) {
