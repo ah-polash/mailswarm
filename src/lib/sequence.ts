@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/ses";
 import { getByPath, resolveMergeTags } from "@/lib/merge";
 import { unsubscribeLinks } from "@/lib/unsubscribe";
+import { addUtmParams, utmSlug } from "@/lib/utm";
 
 export { getByPath, resolveMergeTags };
 
@@ -123,7 +124,11 @@ export async function fireSequenceStep(
   // fields (subject, from name) to rule out header injection.
   const stripCrlf = (s: string) => s.replace(/[\r\n]+/g, " ").trim();
   const subject = stripCrlf(resolveMergeTags(step.subject, payload));
-  const htmlBody = resolveMergeTags(step.htmlContent, payload, { html: true });
+  const htmlBody = addUtmParams(
+    resolveMergeTags(step.htmlContent, payload, { html: true }),
+    { campaign: utmSlug(step.sequence.name), content: `step-${stepNumber}` },
+    baseUrl
+  );
   const fromName =
     stripCrlf(resolveMergeTags(step.sequence.fromName || "bPlugins", payload)) || "bPlugins";
 

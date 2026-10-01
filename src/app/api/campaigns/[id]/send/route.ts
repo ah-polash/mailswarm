@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { sendBulkEmails } from "@/lib/ses";
 import { getSegmentContacts } from "@/lib/swipeone";
 import { unsubscribeLinks } from "@/lib/unsubscribe";
+import { addUtmParams, utmSlug } from "@/lib/utm";
 
 export async function POST(
   request: NextRequest,
@@ -363,6 +364,7 @@ export async function POST(
     const emails = chunkEmails.map((email) => {
       const contactData = contactByEmail.get(email) || { email };
       let htmlBody = resolveMergeTags(campaign.htmlContent, contactData);
+      htmlBody = addUtmParams(htmlBody, { campaign: utmSlug(campaign.name) }, baseUrl);
       htmlBody = wrapLinksForTracking(htmlBody, id, email);
       htmlBody = injectOpenPixel(htmlBody, id, email);
       const unsubscribe = unsubscribeLinks(baseUrl, email, id);
